@@ -3,16 +3,22 @@
 import { Trash2 } from "lucide-react";
 import { useTransition } from "react";
 
-import { deleteFoodLog } from "./actions";
+import { deleteWorkoutSession } from "../actions";
 
-export function DeleteLogButton({ id }: { id: number }) {
+export function DeleteSessionButton({
+  id,
+  workoutId,
+}: {
+  id: number;
+  workoutId: number;
+}) {
   const [pending, start] = useTransition();
   return (
     <button
       type="button"
-      aria-label="Remover"
+      aria-label="Remover registro"
       disabled={pending}
-      onClick={() => start(() => deleteFoodLog(id))}
+      onClick={() => start(() => deleteWorkoutSession(id, workoutId))}
       className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive disabled:opacity-40"
     >
       <Trash2 className="size-4" />

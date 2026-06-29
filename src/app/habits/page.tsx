@@ -18,16 +18,10 @@ export default async function HabitsPage() {
   const date = todayISO();
   const weekday = weekdayOf(date);
 
-  const allHabits = await db
-    .select()
-    .from(habits)
-    .where(eq(habits.archived, false))
-    .orderBy(habits.sortOrder);
-
-  const todayLogs = await db
-    .select()
-    .from(habitLogs)
-    .where(eq(habitLogs.logDate, date));
+  const [allHabits, todayLogs] = await Promise.all([
+    db.select().from(habits).where(eq(habits.archived, false)).orderBy(habits.sortOrder),
+    db.select().from(habitLogs).where(eq(habitLogs.logDate, date)),
+  ]);
   const doneSet = new Set(todayLogs.filter((l) => l.done).map((l) => l.habitId));
 
   const checklist: ChecklistItem[] = allHabits

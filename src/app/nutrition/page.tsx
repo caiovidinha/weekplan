@@ -1,18 +1,19 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { Settings2 } from "lucide-react";
 import Link from "next/link";
 
+import { CalorieTrend, type TrendPoint } from "@/components/calorie-trend";
 import { DayNav } from "@/components/day-nav";
 import { MacroStats } from "@/components/macro-stats";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { db } from "@/db";
 import { foodLogs, nutritionGoals } from "@/db/schema";
-import { todayISO } from "@/lib/date";
+import { formatWeekdayShort, todayISO, weekDays } from "@/lib/date";
 import { MEAL_LABELS, MEAL_ORDER, sumTotals, type MealType } from "@/lib/nutrition";
 import { AddFoodDialog } from "./add-food-dialog";
-import { DeleteLogButton } from "./delete-log-button";
+import { FoodLogItem } from "./food-log-item";
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -26,15 +27,37 @@ export default async function NutritionPage({
   const { d } = await searchParams;
   const date = d && ISO_RE.test(d) ? d : todayISO();
 
-  const [goalsRow] = await db.select().from(nutritionGoals).limit(1);
-  const goals = goalsRow ?? { kcal: 2000, protein: 150, carbs: 200, fat: 60 };
+  const week = weekDays(date);
+  const weekStart = week[0];
+  const weekEnd = week[week.length - 1];
 
-  const logs = await db.select().from(foodLogs).where(eq(foodLogs.logDate, date));
+  const [goalsRows, logs, dailyKcal] = await Promise.all([
+    db.select().from(nutritionGoals).limit(1),
+    db.select().from(foodLogs).where(eq(foodLogs.logDate, date)),
+    db
+      .select({
+        day: foodLogs.logDate,
+        kcal: sql<number>`coalesce(sum(${foodLogs.kcal}), 0)`,
+      })
+      .from(foodLogs)
+      .where(and(gte(foodLogs.logDate, weekStart), lte(foodLogs.logDate, weekEnd)))
+      .groupBy(foodLogs.logDate),
+  ]);
+
+  const goals = goalsRows[0] ?? { kcal: 2000, protein: 150, carbs: 200, fat: 60 };
 
   const totals = sumTotals(logs);
   const byMeal = new Map<MealType, typeof logs>();
   for (const meal of MEAL_ORDER) byMeal.set(meal, []);
   for (const log of logs) byMeal.get(log.meal as MealType)?.push(log);
+
+  const kcalByDay = new Map(dailyKcal.map((r) => [r.day, Number(r.kcal)]));
+  const today = todayISO();
+  const trend: TrendPoint[] = week.map((day) => ({
+    label: formatWeekdayShort(day),
+    kcal: Math.round(kcalByDay.get(day) ?? 0),
+    isToday: day === today,
+  }));
 
   return (
     <div className="space-y-4">
@@ -54,6 +77,15 @@ export default async function NutritionPage({
       <Card>
         <CardContent className="pt-4">
           <MacroStats totals={totals} goals={goals} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Calorias na semana</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <CalorieTrend data={trend} goal={goals.kcal} />
         </CardContent>
       </Card>
 
@@ -78,16 +110,7 @@ export default async function NutritionPage({
               ) : (
                 <ul className="divide-y divide-border">
                   {items.map((log) => (
-                    <li key={log.id} className="flex items-center gap-2 py-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm">{log.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {Math.round(log.grams)}g · {Math.round(log.kcal)} kcal · P{" "}
-                          {log.protein} · C {log.carbs} · G {log.fat}
-                        </p>
-                      </div>
-                      <DeleteLogButton id={log.id} />
-                    </li>
+                    <FoodLogItem key={log.id} log={log} />
                   ))}
                 </ul>
               )}

@@ -35,6 +35,9 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // Resize the layout (and dvh units) when the mobile keyboard opens so
+  // bottom-anchored dialogs stay above it instead of being pushed off-screen.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

@@ -36,16 +36,14 @@ export default async function CalendarPage({
   const last = days[days.length - 1];
   const today = todayISO();
 
-  const weekEvents = await db
-    .select()
-    .from(events)
-    .where(and(gte(events.eventDate, first), lte(events.eventDate, last)))
-    .orderBy(asc(events.startTime));
-
-  const workoutOptions = await db
-    .select({ id: workouts.id, name: workouts.name })
-    .from(workouts)
-    .orderBy(workouts.name);
+  const [weekEvents, workoutOptions] = await Promise.all([
+    db
+      .select()
+      .from(events)
+      .where(and(gte(events.eventDate, first), lte(events.eventDate, last)))
+      .orderBy(asc(events.startTime)),
+    db.select({ id: workouts.id, name: workouts.name }).from(workouts).orderBy(workouts.name),
+  ]);
 
   const byDay = new Map<string, typeof weekEvents>();
   for (const day of days) byDay.set(day, []);
@@ -114,12 +112,16 @@ export default async function CalendarPage({
                     {dayEvents.map((ev) => (
                       <EventRow
                         key={ev.id}
+                        workouts={workoutOptions}
                         event={{
                           id: ev.id,
                           title: ev.title,
                           type: ev.type as EventType,
+                          eventDate: ev.eventDate,
                           startTime: ev.startTime,
                           endTime: ev.endTime,
+                          notes: ev.notes,
+                          workoutId: ev.workoutId,
                           done: ev.done,
                         }}
                       />

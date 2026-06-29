@@ -74,7 +74,7 @@ export function AddFoodDialog({ date, meal }: { date: string; meal: string }) {
           <Plus /> Adicionar
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className={selected ? undefined : "h-[80dvh] overflow-hidden"}>
         <DialogHeader>
           <DialogTitle>{MEAL_LABELS[meal] ?? "Refeição"}</DialogTitle>
         </DialogHeader>
@@ -115,8 +115,8 @@ export function AddFoodDialog({ date, meal }: { date: string; meal: string }) {
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
-            <div className="relative">
+          <div className="flex min-h-0 flex-1 flex-col gap-3">
+            <div className="relative shrink-0">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Buscar alimento (ex: arroz, frango)…"
@@ -126,7 +126,7 @@ export function AddFoodDialog({ date, meal }: { date: string; meal: string }) {
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <div className="max-h-[50dvh] space-y-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
               {searching ? (
                 <p className="py-4 text-center text-sm text-muted-foreground">Buscando…</p>
               ) : null}

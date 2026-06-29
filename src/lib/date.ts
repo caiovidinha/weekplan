@@ -11,9 +11,16 @@ import { ptBR } from "date-fns/locale";
 /** A calendar date with no time component, e.g. "2026-06-28". */
 export type ISODate = string;
 
-/** Today's local date as an ISO date string (no timezone surprises). */
+/** The app's reference timezone — everything is "today" in Brasília. */
+export const APP_TIMEZONE = "America/Sao_Paulo";
+
+/**
+ * Today's date in the app timezone as an ISO date string. Uses `Intl` with a
+ * fixed timezone so it's correct regardless of where the code runs (e.g. a
+ * Vercel function in UTC). The `en-CA` locale formats as `YYYY-MM-DD`.
+ */
 export function todayISO(): ISODate {
-  return format(new Date(), "yyyy-MM-dd");
+  return new Intl.DateTimeFormat("en-CA", { timeZone: APP_TIMEZONE }).format(new Date());
 }
 
 export function toISODate(date: Date): ISODate {

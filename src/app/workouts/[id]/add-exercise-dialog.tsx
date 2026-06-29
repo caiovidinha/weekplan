@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -15,17 +15,34 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { ExerciseKind } from "@/lib/workouts";
-import { addExercise } from "../actions";
+import { addExercise, updateExercise } from "../actions";
+
+export type ExerciseData = {
+  id: number;
+  kind: ExerciseKind;
+  name: string;
+  sets: number | null;
+  reps: number | null;
+  weightKg: number | null;
+  durationMin: number | null;
+  distanceKm: number | null;
+  intensity: string | null;
+  notes: string | null;
+};
 
 export function AddExerciseDialog({
   workoutId,
   defaultKind,
+  exercise,
 }: {
   workoutId: number;
   defaultKind: ExerciseKind;
+  exercise?: ExerciseData;
 }) {
+  const editing = Boolean(exercise);
+  const initialKind = exercise?.kind ?? defaultKind;
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<ExerciseKind>(defaultKind);
+  const [kind, setKind] = useState<ExerciseKind>(initialKind);
   const [pending, start] = useTransition();
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -37,33 +54,50 @@ export function AddExerciseDialog({
       const v = fd.get(k);
       return v === null || v === "" ? null : Number(v);
     };
+    const payload = {
+      workoutId,
+      kind,
+      name,
+      sets: num("sets"),
+      reps: num("reps"),
+      weightKg: num("weightKg"),
+      durationMin: num("durationMin"),
+      distanceKm: num("distanceKm"),
+      intensity: (String(fd.get("intensity") ?? "").trim() || null) as string | null,
+      notes: (String(fd.get("notes") ?? "").trim() || null) as string | null,
+    };
     start(async () => {
-      await addExercise({
-        workoutId,
-        kind,
-        name,
-        sets: num("sets"),
-        reps: num("reps"),
-        weightKg: num("weightKg"),
-        durationMin: num("durationMin"),
-        distanceKm: num("distanceKm"),
-        intensity: (String(fd.get("intensity") ?? "").trim() || null) as string | null,
-        notes: (String(fd.get("notes") ?? "").trim() || null) as string | null,
-      });
+      if (editing && exercise) {
+        await updateExercise({ ...payload, id: exercise.id });
+      } else {
+        await addExercise(payload);
+      }
       setOpen(false);
     });
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) setKind(defaultKind); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (v) setKind(initialKind);
+      }}
+    >
       <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus /> Exercício
-        </Button>
+        {editing ? (
+          <Button variant="ghost" size="icon" aria-label="Editar exercício">
+            <Pencil />
+          </Button>
+        ) : (
+          <Button size="sm">
+            <Plus /> Exercício
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Novo exercício</DialogTitle>
+          <DialogTitle>{editing ? "Editar exercício" : "Novo exercício"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-2">
@@ -90,36 +124,42 @@ export function AddExerciseDialog({
               id="ex-name"
               name="name"
               autoFocus
+              defaultValue={exercise?.name ?? ""}
               placeholder={kind === "strength" ? "Ex: Supino reto" : "Ex: Corrida leve"}
             />
           </div>
 
           {kind === "strength" ? (
             <div className="grid grid-cols-3 gap-2">
-              <Field name="sets" label="Séries" />
-              <Field name="reps" label="Reps" />
-              <Field name="weightKg" label="Carga (kg)" />
+              <Field name="sets" label="Séries" value={exercise?.sets} />
+              <Field name="reps" label="Reps" value={exercise?.reps} />
+              <Field name="weightKg" label="Carga (kg)" value={exercise?.weightKg} />
             </div>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-2">
-                <Field name="durationMin" label="Duração (min)" />
-                <Field name="distanceKm" label="Distância (km)" />
+                <Field name="durationMin" label="Duração (min)" value={exercise?.durationMin} />
+                <Field name="distanceKm" label="Distância (km)" value={exercise?.distanceKm} />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="ex-intensity">Intensidade</Label>
-                <Input id="ex-intensity" name="intensity" placeholder="Ex: Z2, moderado" />
+                <Input
+                  id="ex-intensity"
+                  name="intensity"
+                  defaultValue={exercise?.intensity ?? ""}
+                  placeholder="Ex: Z2, moderado"
+                />
               </div>
             </>
           )}
 
           <div className="space-y-1">
             <Label htmlFor="ex-notes">Notas (opcional)</Label>
-            <Input id="ex-notes" name="notes" />
+            <Input id="ex-notes" name="notes" defaultValue={exercise?.notes ?? ""} />
           </div>
 
           <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Salvando…" : "Adicionar"}
+            {pending ? "Salvando…" : editing ? "Salvar" : "Adicionar"}
           </Button>
         </form>
       </DialogContent>
@@ -127,11 +167,25 @@ export function AddExerciseDialog({
   );
 }
 
-function Field({ name, label }: { name: string; label: string }) {
+function Field({
+  name,
+  label,
+  value,
+}: {
+  name: string;
+  label: string;
+  value?: number | null;
+}) {
   return (
     <div className="space-y-1">
       <Label htmlFor={`ex-${name}`}>{label}</Label>
-      <Input id={`ex-${name}`} name={name} type="number" inputMode="decimal" />
+      <Input
+        id={`ex-${name}`}
+        name={name}
+        type="number"
+        inputMode="decimal"
+        defaultValue={value ?? ""}
+      />
     </div>
   );
 }

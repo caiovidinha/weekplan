@@ -8,6 +8,13 @@
       "when": 1782694683263,
       "tag": "0000_curved_junta",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782696558980,
+      "tag": "0001_cooing_blackheart",
+      "breakpoints": true
     }
   ]
 }

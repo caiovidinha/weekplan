@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { db } from "@/db";
-import { workoutExercises, workouts } from "@/db/schema";
+import { workoutExercises, workoutSessions, workouts } from "@/db/schema";
 
 const workoutSchema = z.object({
   name: z.string().min(1).max(80),
@@ -76,7 +76,71 @@ export async function addExercise(input: z.infer<typeof exerciseSchema>): Promis
   revalidatePath(`/workouts/${data.workoutId}`);
 }
 
+export async function updateExercise(
+  input: z.infer<typeof exerciseSchema> & { id: number },
+): Promise<void> {
+  const data = exerciseSchema.extend({ id: z.number().int().positive() }).parse(input);
+  await db
+    .update(workoutExercises)
+    .set({
+      kind: data.kind,
+      name: data.name,
+      sets: data.sets ?? null,
+      reps: data.reps ?? null,
+      weightKg: data.weightKg ?? null,
+      durationMin: data.durationMin ?? null,
+      distanceKm: data.distanceKm ?? null,
+      intensity: data.intensity ?? null,
+      notes: data.notes ?? null,
+    })
+    .where(eq(workoutExercises.id, data.id));
+  revalidatePath(`/workouts/${data.workoutId}`);
+}
+
 export async function deleteExercise(id: number, workoutId: number): Promise<void> {
   await db.delete(workoutExercises).where(eq(workoutExercises.id, id));
   revalidatePath(`/workouts/${workoutId}`);
+}
+
+/* ------------------------------- Sessions -------------------------------- */
+
+const sessionSchema = z.object({
+  workoutId: z.coerce.number().int().positive(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  durationMin: z.coerce.number().min(0).max(1000).nullish(),
+  notes: z.string().max(300).nullish(),
+});
+
+export async function logWorkoutSession(
+  input: z.infer<typeof sessionSchema>,
+): Promise<void> {
+  const data = sessionSchema.parse(input);
+  const [workout] = await db
+    .select()
+    .from(workouts)
+    .where(eq(workouts.id, data.workoutId))
+    .limit(1);
+  if (!workout) throw new Error("Treino não encontrado");
+
+  await db.insert(workoutSessions).values({
+    workoutId: workout.id,
+    name: workout.name,
+    type: workout.type,
+    sessionDate: data.date,
+    durationMin: data.durationMin ?? null,
+    notes: data.notes ?? null,
+  });
+  revalidatePath(`/workouts/${data.workoutId}`);
+  revalidatePath("/workouts");
+  revalidatePath("/");
+}
+
+export async function deleteWorkoutSession(
+  id: number,
+  workoutId?: number,
+): Promise<void> {
+  await db.delete(workoutSessions).where(eq(workoutSessions.id, id));
+  if (workoutId) revalidatePath(`/workouts/${workoutId}`);
+  revalidatePath("/workouts");
+  revalidatePath("/");
 }

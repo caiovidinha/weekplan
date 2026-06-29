@@ -1,22 +1,32 @@
 "use client";
 
-import { Check, Trash2 } from "lucide-react";
+import { Check, Pencil, Trash2 } from "lucide-react";
 import { useTransition } from "react";
 
 import { eventColorVar, eventLabel, formatTime, type EventType } from "@/lib/events";
 import { cn } from "@/lib/utils";
 import { deleteEvent, toggleEventDone } from "./actions";
+import { EventDialog } from "./event-dialog";
 
 export type EventRowData = {
   id: number;
   title: string;
   type: EventType;
+  eventDate: string;
   startTime: string | null;
   endTime: string | null;
+  notes: string | null;
+  workoutId: number | null;
   done: boolean;
 };
 
-export function EventRow({ event }: { event: EventRowData }) {
+export function EventRow({
+  event,
+  workouts,
+}: {
+  event: EventRowData;
+  workouts: { id: number; name: string }[];
+}) {
   const [pending, start] = useTransition();
   const time = formatTime(event.startTime);
   const endTime = formatTime(event.endTime);
@@ -46,6 +56,21 @@ export function EventRow({ event }: { event: EventRowData }) {
           {eventLabel(event.type)}
         </p>
       </div>
+
+      <EventDialog
+        defaultDate={event.eventDate}
+        workouts={workouts}
+        event={event}
+        trigger={
+          <button
+            type="button"
+            aria-label="Editar evento"
+            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent"
+          >
+            <Pencil className="size-4" />
+          </button>
+        }
+      />
 
       <button
         type="button"

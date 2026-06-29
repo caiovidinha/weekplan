@@ -53,6 +53,42 @@ export async function deleteFoodLog(id: number): Promise<void> {
   revalidatePath("/");
 }
 
+const updateLogSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  grams: z.coerce.number().positive().max(5000),
+});
+
+export async function updateFoodLog(input: z.infer<typeof updateLogSchema>): Promise<void> {
+  const { id, grams } = updateLogSchema.parse(input);
+
+  const [log] = await db.select().from(foodLogs).where(eq(foodLogs.id, id)).limit(1);
+  if (!log) throw new Error("Registro não encontrado");
+
+  // Prefer recomputing from the source food's per-100g values; if the food was
+  // deleted, scale the existing snapshot proportionally to the new quantity.
+  let macros = { kcal: log.kcal, protein: log.protein, carbs: log.carbs, fat: log.fat };
+  if (log.foodId) {
+    const [food] = await db.select().from(foods).where(eq(foods.id, log.foodId)).limit(1);
+    if (food) macros = macrosForGrams(food, grams);
+    else macros = scaleSnapshot(log, grams);
+  } else {
+    macros = scaleSnapshot(log, grams);
+  }
+
+  await db.update(foodLogs).set({ grams, ...macros }).where(eq(foodLogs.id, id));
+  revalidatePath("/nutrition");
+  revalidatePath("/");
+}
+
+function scaleSnapshot(
+  log: { grams: number; kcal: number; protein: number; carbs: number; fat: number },
+  grams: number,
+) {
+  const f = log.grams > 0 ? grams / log.grams : 0;
+  const r = (v: number) => Math.round(v * f * 10) / 10;
+  return { kcal: Math.round(log.kcal * f), protein: r(log.protein), carbs: r(log.carbs), fat: r(log.fat) };
+}
+
 const customFoodSchema = z.object({
   name: z.string().min(1).max(120),
   category: z.string().max(120).optional(),

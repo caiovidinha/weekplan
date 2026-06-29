@@ -38,6 +38,26 @@ export async function createEvent(input: z.infer<typeof eventSchema>): Promise<v
   revalidatePath("/");
 }
 
+export async function updateEvent(
+  input: z.infer<typeof eventSchema> & { id: number },
+): Promise<void> {
+  const data = eventSchema.extend({ id: z.number().int().positive() }).parse(input);
+  await db
+    .update(events)
+    .set({
+      title: data.title,
+      type: data.type,
+      eventDate: data.date,
+      startTime: data.startTime ?? null,
+      endTime: data.endTime ?? null,
+      notes: data.notes ?? null,
+      workoutId: data.workoutId ?? null,
+    })
+    .where(eq(events.id, data.id));
+  revalidatePath("/calendar");
+  revalidatePath("/");
+}
+
 export async function deleteEvent(id: number): Promise<void> {
   await db.delete(events).where(eq(events.id, id));
   revalidatePath("/calendar");

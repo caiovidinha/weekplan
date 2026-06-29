@@ -177,6 +177,27 @@ export const events = pgTable("events", {
 });
 
 /* -------------------------------------------------------------------------- */
+/*                          Completed workout history                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A record of a workout actually performed on a given day. `name`/`type` are
+ * snapshots so history survives editing or deleting the source template.
+ */
+export const workoutSessions = pgTable("workout_sessions", {
+  id: serial("id").primaryKey(),
+  workoutId: integer("workout_id").references(() => workouts.id, {
+    onDelete: "set null",
+  }),
+  name: text("name").notNull(),
+  type: workoutTypeEnum("type").notNull().default("gym"),
+  sessionDate: date("session_date").notNull(),
+  durationMin: real("duration_min"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* -------------------------------------------------------------------------- */
 /*                              Inferred row types                             */
 /* -------------------------------------------------------------------------- */
 
@@ -194,3 +215,5 @@ export type WorkoutExercise = typeof workoutExercises.$inferSelect;
 export type NewWorkoutExercise = typeof workoutExercises.$inferInsert;
 export type WeekEvent = typeof events.$inferSelect;
 export type NewWeekEvent = typeof events.$inferInsert;
+export type WorkoutSession = typeof workoutSessions.$inferSelect;
+export type NewWorkoutSession = typeof workoutSessions.$inferInsert;

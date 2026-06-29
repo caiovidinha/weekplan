@@ -26,32 +26,27 @@ export default async function DashboardPage() {
   const date = todayISO();
   const weekday = weekdayOf(date);
 
-  const [goalsRow] = await db.select().from(nutritionGoals).limit(1);
-  const goals = goalsRow ?? { kcal: 2000, protein: 150, carbs: 200, fat: 60 };
+  // Independent queries run concurrently — neon-http does one round-trip per
+  // query, so serializing them stacks the latency to the (sa-east-1) database.
+  const [goalsRows, logs, allHabits, todayHabitLogs, todayEvents] = await Promise.all([
+    db.select().from(nutritionGoals).limit(1),
+    db.select().from(foodLogs).where(eq(foodLogs.logDate, date)),
+    db.select().from(habits).where(eq(habits.archived, false)).orderBy(habits.sortOrder),
+    db.select().from(habitLogs).where(eq(habitLogs.logDate, date)),
+    db
+      .select()
+      .from(events)
+      .where(and(gte(events.eventDate, date), lte(events.eventDate, date)))
+      .orderBy(asc(events.startTime)),
+  ]);
 
-  const logs = await db.select().from(foodLogs).where(eq(foodLogs.logDate, date));
+  const goals = goalsRows[0] ?? { kcal: 2000, protein: 150, carbs: 200, fat: 60 };
   const totals = sumTotals(logs);
-
-  const allHabits = await db
-    .select()
-    .from(habits)
-    .where(eq(habits.archived, false))
-    .orderBy(habits.sortOrder);
-  const todayHabitLogs = await db
-    .select()
-    .from(habitLogs)
-    .where(eq(habitLogs.logDate, date));
   const doneSet = new Set(todayHabitLogs.filter((l) => l.done).map((l) => l.habitId));
   const checklist: ChecklistItem[] = allHabits
     .filter((h) => h.weekdays.includes(weekday))
     .map((h) => ({ id: h.id, name: h.name, icon: h.icon, color: h.color, done: doneSet.has(h.id) }));
   const doneCount = checklist.filter((c) => c.done).length;
-
-  const todayEvents = await db
-    .select()
-    .from(events)
-    .where(and(gte(events.eventDate, date), lte(events.eventDate, date)))
-    .orderBy(asc(events.startTime));
 
   return (
     <div className="space-y-4 pt-2">
